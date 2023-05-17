@@ -1122,19 +1122,19 @@ func (g *Generator) generateMessageEncoder(structName string, fields []*descript
 				b.P("uint64 j = 0;")
 				b.P(fmt.Sprintf("while (j < encodedInstance.%s[i].key.length) {", fieldName))
 				b.Indent()
-				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].key[j];", fieldName, fieldName))
+				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].key[j++];", fieldName, fieldName))
 				b.Unindent()
 				b.P("}")
 				b.P("j = 0;")
 				b.P(fmt.Sprintf("while (j < encodedInstance.%s[i].length.length) {", fieldName))
 				b.Indent()
-				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].length[j];", fieldName, fieldName))
+				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].length[j++];", fieldName, fieldName))
 				b.Unindent()
 				b.P("}")
 				b.P("j = 0;")
 				b.P(fmt.Sprintf("while (j < encodedInstance.%s[i].nestedInstance.length) {", fieldName))
 				b.Indent()
-				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].nestedInstance[j];", fieldName, fieldName))
+				b.P(fmt.Sprintf("encodedInstance.%s__Encoded[index++] = encodedInstance.%s[i].nestedInstance[j++];", fieldName, fieldName))
 				b.Unindent()
 				b.P("}")
 				b.Unindent()
@@ -1246,7 +1246,9 @@ func (g *Generator) generateMessageEncoder(structName string, fields []*descript
 					b.P(fmt.Sprintf("encodedInstance.%s = ProtobufLib.encode_uint64(uint64(bytes(instance.%s).length));", fieldNameLength, fieldName))
 					b.P(fmt.Sprintf("encodedInstance.%s = bytes(instance.%s);", fieldName, fieldName))
 				case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
-					b.P(fmt.Sprintf("encodedInstance.%s = ProtobufLib.encode_int32(int32(instance.%s));", fieldName, fieldName))
+					b.P(fmt.Sprintf("int256 enum_val_i256 = int256(uint(instance.%s));", fieldName));
+					b.P(fmt.Sprintf("int32 enum_val_i32 = int32(int(enum_val_i256));"))
+					b.P(fmt.Sprintf("encodedInstance.%s = ProtobufLib.encode_int32(enum_val_i32);", fieldName))
 				default:
 					fieldDecodeType, err := typeToDecodeSol(fieldDescriptorType)
 					if err != nil {
@@ -1280,6 +1282,12 @@ func (g *Generator) generateMessageEncoder(structName string, fields []*descript
 			b.P(fmt.Sprintf("len += uint64(encodedInstance.%s__Encoded.length);", fieldName))
 		default:
 			// Non-message type
+			b.P(fmt.Sprintf("len += uint64(encodedInstance.%s__Key.length);", fieldName));
+			if isFieldRepeated(field) ||
+				fieldDescriptorType == descriptorpb.FieldDescriptorProto_TYPE_STRING ||
+				fieldDescriptorType == descriptorpb.FieldDescriptorProto_TYPE_BYTES {
+					b.P(fmt.Sprintf("len += uint64(encodedInstance.%s__Length.length);", fieldName));
+				}
 			b.P(fmt.Sprintf("len += uint64(encodedInstance.%s.length);", fieldName))
 		}
 	}
@@ -1301,15 +1309,33 @@ func (g *Generator) generateMessageEncoder(structName string, fields []*descript
 			b.P("j = 0;")
 			b.P(fmt.Sprintf("while (j < encodedInstance.%s__Encoded.length) {", fieldName))
 			b.Indent()
-			b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s__Encoded[j];", fieldName))
+			b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s__Encoded[j++];", fieldName))
 			b.Unindent()
 			b.P("}")
 		default:
 			// Non-message type
 			b.P("j = 0;")
+			b.P(fmt.Sprintf("while (j < encodedInstance.%s__Key.length) {", fieldName))
+			b.Indent()
+			b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s__Key[j++];", fieldName))
+			b.Unindent()
+			b.P("}")
+
+			if isFieldRepeated(field) ||
+				fieldDescriptorType == descriptorpb.FieldDescriptorProto_TYPE_STRING ||
+				fieldDescriptorType == descriptorpb.FieldDescriptorProto_TYPE_BYTES {
+					b.P("j = 0;")
+					b.P(fmt.Sprintf("while (j < encodedInstance.%s__Length.length) {", fieldName))
+					b.Indent()
+					b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s__Length[j++];", fieldName))
+					b.Unindent()
+					b.P("}")
+			}
+
+			b.P("j = 0;")
 			b.P(fmt.Sprintf("while (j < encodedInstance.%s.length) {", fieldName))
 			b.Indent()
-			b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s[j];", fieldName))
+			b.P(fmt.Sprintf("finalEncoded[index++] = encodedInstance.%s[j++];", fieldName))
 			b.Unindent()
 			b.P("}")
 		}
